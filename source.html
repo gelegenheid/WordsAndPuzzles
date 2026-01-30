@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Guess Game</title>
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 20px; background:#121213; color:white; }
+  h1 { margin-bottom: 10px; }
+  #board { margin-bottom: 20px; }
+  .row { display: flex; justify-content: center; margin: 5px 0; }
+  .letter-box {
+    width: 50px; height: 50px; border: 2px solid #3a3a3c; 
+    margin: 3px; font-size: 28px; text-align: center; 
+    text-transform: uppercase; font-weight: bold; display:flex; justify-content:center; align-items:center;
+    background: #121213; color:white;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .correct { background-color: #6aaa64; border-color: #6aaa64; color:white; }
+  .present { background-color: #c9b458; border-color: #c9b458; color:white; }
+  .absent { background-color: #787c7e; border-color: #787c7e; color:white; }
+  #message { font-size: 18px; margin-top: 10px; }
+  #keyboard { margin-top: 20px; display:flex; flex-direction: column; align-items:center; }
+  .key-row { display:flex; justify-content:center; margin:2px 0; }
+  .key {
+    width: 40px; height: 50px; margin: 3px; font-weight: bold; font-size: 16px; border: none; cursor: pointer;
+    background: #3a3a3c; color:white; border-radius: 4px;
+    transition: background 0.3s;
+  }
+  .key.correct { background-color: #6aaa64; color:white; }
+  .key.present { background-color: #c9b458; color:white; }
+  .key.absent { background-color: #787c7e; color:white; }
+</style>
+</head>
+<body>
+
+<h1>Word Guess Game</h1>
+<p>Type your guess and press Enter, or click letters below</p>
+<div id="board"></div>
+<div id="keyboard"></div>
+<p id="message"></p>
+
+<script>
+const words = ["apple","brave","crane","drink","flame","ghost","honey","juice","light","money"];
+const secretWord = words[Math.floor(Math.random() * words.length)];
+const board = document.getElementById("board");
+const keyboardDiv = document.getElementById("keyboard");
+const maxAttempts = 6;
+
+let currentGuess = [];
+let currentRow = 0;
+
+// Create empty board
+for (let i = 0; i < maxAttempts; i++) {
+    const row = document.createElement("div");
+    row.className = "row";
+    for (let j = 0; j < 5; j++) {
+        const box = document.createElement("div");
+        box.className = "letter-box";
+        row.appendChild(box);
+    }
+    board.appendChild(row);
+}
+
+// QWERTY layout
+const keyboardRows = [
+    "QWERTYUIOP",
+    "ASDFGHJKL",
+    "ZXCVBNM"
+];
+
+const keyStatus = {}; // store status of each key
+
+// Create keyboard rows
+keyboardRows.forEach(rowLetters => {
+    const rowDiv = document.createElement("div");
+    rowDiv.className = "key-row";
+    rowLetters.split("").forEach(l => {
+        const btn = document.createElement("button");
+        btn.textContent = l;
+        btn.className = "key";
+        btn.id = `key-${l}`;
+        btn.onclick = () => handleKey({key:l});
+        rowDiv.appendChild(btn);
+    });
+    keyboardDiv.appendChild(rowDiv);
+});
+
+// Update current row as user types
+function updateRow() {
+    const row = board.children[currentRow];
+    for (let i = 0; i < 5; i++) {
+        row.children[i].textContent = currentGuess[i] ? currentGuess[i].toUpperCase() : "";
+    }
+}
+
+// Submit guess and color letters
+function submitGuess() {
+    if (currentGuess.length !== 5) return;
+
+    const row = board.children[currentRow];
+    const guess = currentGuess.join('');
+
+    // Prepare arrays for checking letters
+    const secretLetters = secretWord.split('');
+    const guessLetters = guess.split('');
+
+    const letterColors = ['absent','absent','absent','absent','absent'];
+
+    // First pass: correct letters
+    for (let i = 0; i < 5; i++) {
+        if (guessLetters[i] === secretLetters[i]) {
+            letterColors[i] = 'correct';
+            secretLetters[i] = null;
+        }
+    }
+    // Second pass: present letters
+    for (let i = 0; i < 5; i++) {
+        if (letterColors[i] === 'correct') continue;
+        const index = secretLetters.indexOf(guessLetters[i]);
+        if (index !== -1) {
+            letterColors[i] = 'present';
+            secretLetters[index] = null;
+        }
+    }
+
+    // Apply colors to row and update keyboard
+    for (let i = 0; i < 5; i++) {
+        const box = row.children[i];
+        box.classList.add(letterColors[i]);
+
+        const keyId = `key-${guessLetters[i].toUpperCase()}`;
+        const key = document.getElementById(keyId);
+
+        if (!keyStatus[guessLetters[i]]) keyStatus[guessLetters[i]] = letterColors[i];
+        else {
+            // Keep highest priority: correct > present > absent
+            if (keyStatus[guessLetters[i]] !== 'correct') keyStatus[guessLetters[i]] = letterColors[i];
+        }
+        key.className = `key ${keyStatus[guessLetters[i]]}`;
+    }
+
+    if (guess === secretWord) {
+        setTimeout(() => document.getElementById('message').textContent = "🎉 You guessed it!", 100);
+        window.removeEventListener('keydown', handleKey);
+        return;
+    }
+
+    currentRow++;
+    currentGuess = [];
+    updateRow();
+
+    if (currentRow >= maxAttempts) {
+        setTimeout(() => document.getElementById('message').textContent = `❌ Out of guesses! Word was "${secretWord.toUpperCase()}"`, 100);
+        window.removeEventListener('keydown', handleKey);
+    }
+}
+
+// Handle keyboard input
+function handleKey(e) {
+    if (currentRow >= maxAttempts) return;
+
+    const key = e.key.toUpperCase();
+    if (key === 'BACKSPACE') {
+        currentGuess.pop();
+    } else if (key === 'ENTER') {
+        submitGuess();
+    } else if (/^[A-Z]$/.test(key) && currentGuess.length < 5) {
+        currentGuess.push(key.toLowerCase());
+    }
+    updateRow();
+}
+
+window.addEventListener('keydown', handleKey);
+</script>
+
+</body>
+</html>
